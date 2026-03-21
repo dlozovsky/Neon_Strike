@@ -23,9 +23,7 @@ export function Player() {
     activePowerUps,
     isSpectating,
     spectatorTargetId,
-    opponents,
-    playerPos,
-    playerYaw
+    opponents
   } = useGameStore();
   
   const velocity = useRef(new THREE.Vector3());
@@ -126,10 +124,11 @@ export function Player() {
 
   useEffect(() => {
     if (!isSpectating) {
-      camera.position.set(playerPos[0], playerPos[1], playerPos[2]);
-      camera.rotation.set(0, playerYaw, 0);
+      const state = useGameStore.getState();
+      camera.position.set(state.playerPos[0], state.playerPos[1], state.playerPos[2]);
+      camera.rotation.set(0, state.playerYaw, 0);
     }
-  }, [isSpectating]);
+  }, [isSpectating, camera]);
 
   useFrame((state, delta) => {
     if (isSpectating) {

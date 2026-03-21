@@ -33,7 +33,6 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     isPlayerDisabled, 
     updateOpponent, 
     opponents, 
-    playerPos: playerPosStore, 
     playerTeam, 
     hitMarkerActive, 
     incrementTeamScore,
