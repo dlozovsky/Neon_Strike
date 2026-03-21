@@ -44,19 +44,19 @@ export function Arena() {
       <gridHelper args={[ARENA_SIZE, 50, "#00ffff", "#002222"]} position={[0, -0.005, 0]} />
 
       {/* Walls */}
-      <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
+      <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[0, WALL_HEIGHT / 2, -ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
+      <mesh position={[0, WALL_HEIGHT / 2, -ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
+      <mesh position={[ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[-ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
+      <mesh position={[-ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
@@ -68,8 +68,22 @@ export function Arena() {
 
       {/* Ambient and Point Lights for Atmosphere */}
       <ambientLight intensity={0.2} />
-      <pointLight position={[10, 10, 10]} intensity={0.5} color="#ff00ff" castShadow shadow-bias={-0.0001} />
-      <pointLight position={[-10, 10, -10]} intensity={0.5} color="#00ffff" castShadow shadow-bias={-0.0001} />
+      <pointLight 
+        position={[10, 10, 10]} 
+        intensity={0.5} 
+        color="#ff00ff" 
+        castShadow 
+        shadow-bias={-0.001}
+        shadow-mapSize={[512, 512]}
+      />
+      <pointLight 
+        position={[-10, 10, -10]} 
+        intensity={0.5} 
+        color="#00ffff" 
+        castShadow 
+        shadow-bias={-0.001}
+        shadow-mapSize={[512, 512]}
+      />
       <pointLight position={[0, 15, 0]} intensity={0.3} color="#ffffff" />
     </group>
   );

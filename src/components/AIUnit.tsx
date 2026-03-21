@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ interface OpponentProps {
 
 type AIState = 'patrol' | 'chase' | 'flank' | 'seekCover' | 'attack' | 'guardPlayer' | 'coordinateAttack' | 'peek';
 
-export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
+export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const [health, setHealth] = useState(100);
@@ -901,5 +901,5 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       </mesh>
     </group>
   </>
-);
-}
+  );
+});

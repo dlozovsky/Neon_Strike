@@ -4,7 +4,11 @@ import { Target, Timer, Trophy, ShieldAlert, Map as MapIcon, Zap, Flame, Shield,
 import { ARENA_SIZE, OBSTACLES } from './Arena';
 
 function Minimap() {
-  const { playerPos, playerYaw, opponents, spawnedPowerUps } = useGameStore();
+  const playerPos = useGameStore(state => state.playerPos);
+  const playerYaw = useGameStore(state => state.playerYaw);
+  const opponents = useGameStore(state => state.opponents);
+  const spawnedPowerUps = useGameStore(state => state.spawnedPowerUps);
+  const spectatorTargetId = useGameStore(state => state.spectatorTargetId);
   const scale = 3; // pixels per unit
   const size = ARENA_SIZE * scale;
 
@@ -33,69 +37,86 @@ function Minimap() {
         />
       ))}
 
-      {/* Opponents */}
-      {Object.values(opponents).map((opp) => (
-        <div
-          key={opp.id}
-          className={`absolute w-2 h-2 rounded-full transition-all duration-100 ${
-            opp.isDisabled ? 'bg-gray-500' : 
-            opp.team === 'A' ? 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]' : 
-            'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]'
-          } ${useGameStore.getState().spectatorTargetId === opp.id ? 'ring-2 ring-white ring-offset-1 ring-offset-black animate-pulse scale-125 z-20' : ''}`}
-          style={{
-            left: (opp.pos[0] + ARENA_SIZE / 2) * scale - 4,
-            top: (opp.pos[2] + ARENA_SIZE / 2) * scale - 4,
-          }}
-        />
-      ))}
+          {/* Opponents */}
+          {Object.values(opponents).map((opp) => (
+            <div
+              key={opp.id}
+              className={`absolute w-2 h-2 rounded-full transition-all duration-100 ${
+                opp.isDisabled ? 'bg-gray-500' : 
+                opp.team === 'A' ? 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]' : 
+                'bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]'
+              } ${spectatorTargetId === opp.id ? 'ring-2 ring-white ring-offset-1 ring-offset-black animate-pulse scale-125 z-20' : ''}`}
+              style={{
+                left: (opp.pos[0] + ARENA_SIZE / 2) * scale - 4,
+                top: (opp.pos[2] + ARENA_SIZE / 2) * scale - 4,
+              }}
+            />
+          ))}
+    
+          {/* Power-ups */}
+          {spawnedPowerUps.map((p) => (
+            <div
+              key={p.id}
+              className={`absolute w-1.5 h-1.5 rounded-full animate-pulse ${getPowerUpColor(p.type)}`}
+              style={{
+                left: (p.pos[0] + ARENA_SIZE / 2) * scale - 3,
+                top: (p.pos[2] + ARENA_SIZE / 2) * scale - 3,
+              }}
+            />
+          ))}
+    
+          {/* Player */}
+          <div
+            className={`absolute w-3 h-3 bg-white rounded-full shadow-[0_0_10px_white] z-10 flex items-center justify-center ${
+              spectatorTargetId === 'player' ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-black animate-pulse' : ''
+            }`}
+            style={{
+              left: (playerPos[0] + ARENA_SIZE / 2) * scale - 6,
+              top: (playerPos[2] + ARENA_SIZE / 2) * scale - 6,
+              transform: `rotate(${playerYaw}rad)`
+            }}
+          >
+            <div className="w-1 h-3 bg-cyan-400 rounded-full -translate-y-1" />
+          </div>
+    </div>
+  );
+}
 
-      {/* Power-ups */}
-      {spawnedPowerUps.map((p) => (
-        <div
-          key={p.id}
-          className={`absolute w-1.5 h-1.5 rounded-full animate-pulse ${getPowerUpColor(p.type)}`}
-          style={{
-            left: (p.pos[0] + ARENA_SIZE / 2) * scale - 3,
-            top: (p.pos[2] + ARENA_SIZE / 2) * scale - 3,
-          }}
-        />
-      ))}
+function TimerDisplay() {
+  const timeLeft = useGameStore(state => state.timeLeft);
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
-      {/* Player */}
-      <div
-        className={`absolute w-3 h-3 bg-white rounded-full shadow-[0_0_10px_white] z-10 flex items-center justify-center ${
-          useGameStore.getState().spectatorTargetId === 'player' ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-black animate-pulse' : ''
-        }`}
-        style={{
-          left: (playerPos[0] + ARENA_SIZE / 2) * scale - 6,
-          top: (playerPos[2] + ARENA_SIZE / 2) * scale - 6,
-          transform: `rotate(${playerYaw}rad)`
-        }}
-      >
-        <div className="w-1 h-3 bg-cyan-400 rounded-full -translate-y-1" />
+  return (
+    <div className="flex items-center gap-4 bg-black/50 backdrop-blur-md border border-cyan-500/30 p-4 rounded-xl">
+      <Timer className="text-cyan-400 w-6 h-6" />
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-cyan-500/60 font-bold">Time</div>
+        <div className="text-2xl font-black text-white font-mono">{formatTime(timeLeft)}</div>
       </div>
     </div>
   );
 }
 
 export const HUD = memo(function HUD() {
-  const { 
-    score, 
-    timeLeft, 
-    isPlayerDisabled, 
-    gameStarted, 
-    startGame, 
-    resetGame, 
-    hitMarkerActive, 
-    activePowerUps,
-    isSpectating,
-    spectatorTargetId,
-    setSpectating,
-    cycleSpectatorTarget,
-    opponents,
-    teamAScore,
-    teamBScore
-  } = useGameStore();
+  const score = useGameStore(state => state.score);
+  const timeLeft = useGameStore(state => state.timeLeft);
+  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
+  const gameStarted = useGameStore(state => state.gameStarted);
+  const startGame = useGameStore(state => state.startGame);
+  const resetGame = useGameStore(state => state.resetGame);
+  const hitMarkerActive = useGameStore(state => state.hitMarkerActive);
+  const activePowerUps = useGameStore(state => state.activePowerUps);
+  const isSpectating = useGameStore(state => state.isSpectating);
+  const spectatorTargetId = useGameStore(state => state.spectatorTargetId);
+  const setSpectating = useGameStore(state => state.setSpectating);
+  const cycleSpectatorTarget = useGameStore(state => state.cycleSpectatorTarget);
+  const opponents = useGameStore(state => state.opponents);
+  const teamAScore = useGameStore(state => state.teamAScore);
+  const teamBScore = useGameStore(state => state.teamBScore);
 
   if (!gameStarted) {
     return (
@@ -395,13 +416,7 @@ export const HUD = memo(function HUD() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 bg-black/50 backdrop-blur-md border border-cyan-500/30 p-4 rounded-xl">
-            <Timer className="text-cyan-400 w-6 h-6" />
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-cyan-500/60 font-bold">Time</div>
-              <div className="text-2xl font-black text-white font-mono">{formatTime(timeLeft)}</div>
-            </div>
-          </div>
+          <TimerDisplay />
         </div>
       )}
 

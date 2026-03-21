@@ -1,4 +1,5 @@
 import { memo, useEffect } from 'react';
+import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Stars } from '@react-three/drei';
 import { Arena } from './components/Arena';
@@ -23,10 +24,8 @@ const MemoizedArena = memo(Arena);
 function GameScene() {
   const isGameActive = useGameStore((state) => state.gameStarted && state.timeLeft > 0);
 
-  if (!isGameActive) return null;
-
   return (
-    <>
+    <group visible={isGameActive}>
       <Player />
       <PowerUpManager />
       
@@ -91,7 +90,7 @@ function GameScene() {
           [-10, 1, 0]
         ]}
       />
-    </>
+    </group>
   );
 }
 
@@ -121,15 +120,15 @@ export default function App() {
       <GameController />
       <KeyboardControls map={keyboardMap}>
         <Canvas 
-          shadows 
+          shadows={{ type: THREE.PCFSoftShadowMap }}
           camera={{ fov: 75, near: 0.1, far: 1000 }}
           gl={{ 
             antialias: true, 
-            logarithmicDepthBuffer: true,
             alpha: false,
             stencil: false,
             powerPreference: "high-performance",
-            precision: "highp"
+            precision: "highp",
+            depth: true
           }}
         >
           <color attach="background" args={['#050505']} />

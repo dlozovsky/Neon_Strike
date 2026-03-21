@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, memo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,7 +9,7 @@ import { soundManager } from '../services/soundService';
 const SPEED = 5;
 const PLAYER_RADIUS = 0.5;
 
-export function Player() {
+export const Player = memo(function Player() {
   const [, getKeys] = useKeyboardControls();
   const camera = useThree((state) => state.camera);
   const scene = useThree((state) => state.scene);
@@ -237,4 +237,4 @@ export function Player() {
       )}
     </>
   );
-}
+});
