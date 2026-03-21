@@ -34,9 +34,18 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-black overflow-hidden relative">
       <KeyboardControls map={keyboardMap}>
-        <Canvas shadows camera={{ fov: 75, near: 0.1, far: 200 }}>
+        <Canvas 
+          shadows 
+          camera={{ fov: 75, near: 0.1, far: 1000 }}
+          gl={{ 
+            antialias: true, 
+            logarithmicDepthBuffer: true,
+            alpha: false,
+            stencil: false
+          }}
+        >
           <color attach="background" args={['#050505']} />
-          <fog attach="fog" args={['#050505', 0, 150]} />
+          <fog attach="fog" args={['#050505', 0, 300]} />
           
           <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
           

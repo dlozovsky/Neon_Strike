@@ -46,19 +46,19 @@ export function Arena() {
       {/* Walls */}
       <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
-        <meshStandardMaterial color="#111" transparent opacity={0.5} />
+        <meshStandardMaterial color="#111" />
       </mesh>
       <mesh position={[0, WALL_HEIGHT / 2, -ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
-        <meshStandardMaterial color="#111" transparent opacity={0.5} />
+        <meshStandardMaterial color="#111" />
       </mesh>
       <mesh position={[ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
-        <meshStandardMaterial color="#111" transparent opacity={0.5} />
+        <meshStandardMaterial color="#111" />
       </mesh>
       <mesh position={[-ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
-        <meshStandardMaterial color="#111" transparent opacity={0.5} />
+        <meshStandardMaterial color="#111" />
       </mesh>
 
       {/* Obstacles */}
@@ -68,8 +68,8 @@ export function Arena() {
 
       {/* Ambient and Point Lights for Atmosphere */}
       <ambientLight intensity={0.2} />
-      <pointLight position={[10, 10, 10]} intensity={0.5} color="#ff00ff" castShadow />
-      <pointLight position={[-10, 10, -10]} intensity={0.5} color="#00ffff" castShadow />
+      <pointLight position={[10, 10, 10]} intensity={0.5} color="#ff00ff" castShadow shadow-bias={-0.0001} />
+      <pointLight position={[-10, 10, -10]} intensity={0.5} color="#00ffff" castShadow shadow-bias={-0.0001} />
       <pointLight position={[0, 15, 0]} intensity={0.3} color="#ffffff" />
     </group>
   );
