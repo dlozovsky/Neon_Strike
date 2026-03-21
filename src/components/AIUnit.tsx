@@ -26,19 +26,15 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
   const [hitFlash, setHitFlash] = useState(false);
   const [targetPos, setTargetPos] = useState(new THREE.Vector3(...initialPosition));
   const currentWaypointIndex = useRef(0);
-  const { 
-    score, 
-    hitsReceived, 
-    playerHit, 
-    isPlayerDisabled, 
-    updateOpponent, 
-    opponents, 
-    playerTeam, 
-    hitMarkerActive, 
-    incrementTeamScore,
-    tacticalData,
-    updateTacticalData
-  } = useGameStore();
+  const score = useGameStore(state => state.score);
+  const hitsReceived = useGameStore(state => state.hitsReceived);
+  const playerHit = useGameStore(state => state.playerHit);
+  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
+  const updateOpponent = useGameStore(state => state.updateOpponent);
+  const playerTeam = useGameStore(state => state.playerTeam);
+  const hitMarkerActive = useGameStore(state => state.hitMarkerActive);
+  const incrementTeamScore = useGameStore(state => state.incrementTeamScore);
+  const updateTacticalData = useGameStore(state => state.updateTacticalData);
   
   // Dynamic Difficulty Factor (0.6 to 1.5)
   const difficultyFactor = useMemo(() => {
@@ -255,6 +251,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     playerUnderFireTimer.current = Math.max(0, playerUnderFireTimer.current - delta);
 
     // Find nearest enemy
+    const state = useGameStore.getState();
+    const opponents = state.opponents;
+    const tacticalData = state.tacticalData;
+    
     const playerPos = stateObj.camera.position;
     const distToPlayer = groupRef.current.position.distanceTo(playerPos);
     distToPlayerRef.current = distToPlayer;
@@ -729,14 +729,16 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       team
     };
 
-    // Update store for minimap
-    updateOpponent(id, {
-      id,
-      pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
-      type,
-      isDisabled,
-      team
-    });
+    // Update store for minimap (throttled to every 3 frames)
+    if (stateObj.clock.elapsedTime * 60 % 3 < 1) {
+      updateOpponent(id, {
+        id,
+        pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
+        type,
+        isDisabled,
+        team
+      });
+    }
   });
 
   const stateColors: Record<AIState, string> = {

@@ -41,7 +41,7 @@ export function Arena() {
       </mesh>
       
       {/* Grid Helper */}
-      <gridHelper args={[ARENA_SIZE, 50, "#00ffff", "#002222"]} position={[0, 0.01, 0]} />
+      <gridHelper args={[ARENA_SIZE, 50, "#00ffff", "#002222"]} position={[0, -0.005, 0]} />
 
       {/* Walls */}
       <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>

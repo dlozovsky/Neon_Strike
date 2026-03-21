@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useGameStore, PowerUpType } from '../hooks/useGameStore';
 import { Target, Timer, Trophy, ShieldAlert, Map as MapIcon, Zap, Flame, Shield, Eye, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { ARENA_SIZE, OBSTACLES } from './Arena';
@@ -77,7 +78,7 @@ function Minimap() {
   );
 }
 
-export function HUD() {
+export const HUD = memo(function HUD() {
   const { 
     score, 
     timeLeft, 
@@ -201,7 +202,7 @@ export function HUD() {
       {isSpectating && (
         <>
           {/* Scanning Line Effect */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden animate-[flicker_0.1s_infinite]">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="absolute inset-0 bg-cyan-500/5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, rgba(6, 182, 212, 0.1) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/60 pointer-events-none" />
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
@@ -432,4 +433,4 @@ export function HUD() {
       </div>
     </div>
   );
-}
+});

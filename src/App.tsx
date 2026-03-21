@@ -128,7 +128,8 @@ export default function App() {
             logarithmicDepthBuffer: true,
             alpha: false,
             stencil: false,
-            powerPreference: "high-performance"
+            powerPreference: "high-performance",
+            precision: "highp"
           }}
         >
           <color attach="background" args={['#050505']} />

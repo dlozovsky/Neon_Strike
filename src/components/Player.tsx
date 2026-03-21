@@ -13,18 +13,15 @@ export function Player() {
   const [, getKeys] = useKeyboardControls();
   const camera = useThree((state) => state.camera);
   const scene = useThree((state) => state.scene);
-  const { 
-    isPlayerDisabled, 
-    incrementScore, 
-    respawnRequested, 
-    triggerHitMarker, 
-    updatePlayerTransform, 
-    playerTeam,
-    activePowerUps,
-    isSpectating,
-    spectatorTargetId,
-    opponents
-  } = useGameStore();
+  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
+  const incrementScore = useGameStore(state => state.incrementScore);
+  const respawnRequested = useGameStore(state => state.respawnRequested);
+  const triggerHitMarker = useGameStore(state => state.triggerHitMarker);
+  const updatePlayerTransform = useGameStore(state => state.updatePlayerTransform);
+  const playerTeam = useGameStore(state => state.playerTeam);
+  const activePowerUps = useGameStore(state => state.activePowerUps);
+  const isSpectating = useGameStore(state => state.isSpectating);
+  const spectatorTargetId = useGameStore(state => state.spectatorTargetId);
   
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
@@ -131,6 +128,9 @@ export function Player() {
   }, [isSpectating, camera]);
 
   useFrame((state, delta) => {
+    const gameState = useGameStore.getState();
+    const opponents = gameState.opponents;
+
     if (isSpectating) {
       // Spectator Camera Logic
       let targetPos = new THREE.Vector3();
@@ -211,11 +211,13 @@ export function Player() {
       laserRef.current.translateZ(0.2); // Slightly down
     }
 
-    // Update store for minimap
-    updatePlayerTransform(
-      [camera.position.x, camera.position.y, camera.position.z],
-      camera.rotation.y
-    );
+    // Update store for minimap (throttled to every 3 frames)
+    if (state.clock.elapsedTime * 60 % 3 < 1) {
+      updatePlayerTransform(
+        [camera.position.x, camera.position.y, camera.position.z],
+        camera.rotation.y
+      );
+    }
   });
 
   return (
