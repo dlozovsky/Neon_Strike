@@ -150,11 +150,15 @@ export function Player() {
         const opp = opponents[spectatorTargetId];
         if (opp) {
           targetPos.set(opp.pos[0], opp.pos[1], opp.pos[2]);
-          // Chase camera offset
-          const offset = new THREE.Vector3(0, 2, 5);
-          // We don't have the opponent's yaw easily in the store yet, but we can look at them
+          // Improved Chase camera: Higher and slightly back
+          const offset = new THREE.Vector3(0, 6, 10);
           const camTarget = targetPos.clone();
           const camPos = targetPos.clone().add(offset);
+          
+          // Clamp camera position within arena bounds to avoid clipping into walls
+          const limit = ARENA_SIZE / 2 - 2;
+          camPos.x = Math.max(-limit, Math.min(limit, camPos.x));
+          camPos.z = Math.max(-limit, Math.min(limit, camPos.z));
           
           camera.position.lerp(camPos, 0.1);
           camera.lookAt(camTarget);

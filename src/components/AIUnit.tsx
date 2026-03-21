@@ -70,6 +70,7 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
   const peekDistance = useRef(1.5);
   const lastPeekSide = useRef(1); // 1 or -1
   const currentMoveTarget = useRef(new THREE.Vector3());
+  const distToPlayerRef = useRef(0);
   const [visualState, setVisualState] = useState<AIState>('patrol');
   const [showCallout, setShowCallout] = useState(false);
   const calloutText = useRef("");
@@ -121,7 +122,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     setIsFlashing(true);
     setTimeout(() => setIsFlashing(false), 70);
     
-    soundManager.play('HIT_AI', 0.5);
+    const volume = Math.max(0, 0.5 * (1 - distToPlayerRef.current / 30));
+    if (volume > 0.05) {
+      soundManager.play('HIT_AI', volume);
+    }
     lastHitTime.current = Date.now();
     
     // Immediate reaction to being hit
@@ -254,6 +258,7 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     // Find nearest enemy
     const playerPos = stateObj.camera.position;
     const distToPlayer = groupRef.current.position.distanceTo(playerPos);
+    distToPlayerRef.current = distToPlayer;
     let nearestEnemyPos = playerPos.clone();
     let minDist = distToPlayer;
     let targetIsPlayer = true;
@@ -664,7 +669,7 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       }
 
       // Play AI laser sound
-      const volume = Math.max(0, 0.25 * (1 - distToTarget / 30));
+      const volume = Math.max(0, 0.25 * (1 - distToPlayer / 30));
       soundManager.play('AI_LASER', volume);
 
       // Trigger visual laser
