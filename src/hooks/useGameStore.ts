@@ -35,11 +35,6 @@ interface GameState {
   activePowerUps: Partial<Record<PowerUpType, number>>;
   isSpectating: boolean;
   spectatorTargetId: string | 'player';
-  tacticalData: {
-    lastSpottedPlayerPos: [number, number, number] | null;
-    lastSpottedTime: number;
-    activeManeuvers: Record<string, string>; // unitId -> maneuverType
-  };
   incrementScore: () => void;
   incrementTeamScore: (team: 'A' | 'B') => void;
   playerHit: () => void;
@@ -53,7 +48,6 @@ interface GameState {
   triggerHitMarker: () => void;
   updatePlayerTransform: (pos: [number, number, number], yaw: number) => void;
   updateOpponent: (id: string, data: OpponentData) => void;
-  updateTacticalData: (data: Partial<GameState['tacticalData']>) => void;
   spawnPowerUp: (type: PowerUpType, pos: [number, number, number]) => void;
   collectPowerUp: (id: string) => void;
 }
@@ -76,11 +70,6 @@ export const useGameStore = create<GameState>((set) => ({
   activePowerUps: {},
   isSpectating: false,
   spectatorTargetId: 'player',
-  tacticalData: {
-    lastSpottedPlayerPos: null,
-    lastSpottedTime: 0,
-    activeManeuvers: {},
-  },
   incrementScore: () => set((state) => ({ 
     score: state.score + 100,
     teamAScore: state.teamAScore + 100
@@ -175,9 +164,6 @@ export const useGameStore = create<GameState>((set) => ({
   updatePlayerTransform: (pos, yaw) => set({ playerPos: pos, playerYaw: yaw }),
   updateOpponent: (id, data) => set((state) => ({
     opponents: { ...state.opponents, [id]: data }
-  })),
-  updateTacticalData: (data: Partial<GameState['tacticalData']>) => set((state) => ({
-    tacticalData: { ...state.tacticalData, ...data }
   })),
   spawnPowerUp: (type, pos) => set((state) => ({
     spawnedPowerUps: [...state.spawnedPowerUps, { id: Math.random().toString(36).substr(2, 9), type, pos }]

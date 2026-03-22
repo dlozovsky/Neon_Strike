@@ -39,7 +39,6 @@ export default function App() {
           <fog attach="fog" args={['#050505', 0, 50]} />
           
           <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-          <ambientLight intensity={0.2} />
           
           {gameStarted && timeLeft > 0 && (
             <>
