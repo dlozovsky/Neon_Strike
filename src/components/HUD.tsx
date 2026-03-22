@@ -73,7 +73,7 @@ function Minimap() {
             style={{
               left: (playerPos[0] + ARENA_SIZE / 2) * scale - 6,
               top: (playerPos[2] + ARENA_SIZE / 2) * scale - 6,
-              transform: `rotate(${playerYaw}rad)`
+              transform: `rotate(${-playerYaw}rad)`
             }}
           >
             <div className="w-1 h-3 bg-cyan-400 rounded-full -translate-y-1" />
@@ -219,6 +219,7 @@ export const HUD = memo(function HUD() {
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none">
+      
       {/* Spectator UI */}
       {isSpectating && (
         <>

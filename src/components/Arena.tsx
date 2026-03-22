@@ -62,24 +62,22 @@ export function Arena() {
       ))}
 
       {/* Ambient and Point Lights for Atmosphere */}
-      <ambientLight intensity={0.2} />
+      <ambientLight intensity={0.6} />
       <pointLight 
-        position={[10, 10, 10]} 
-        intensity={0.5} 
-        color="#ff00ff" 
-        castShadow 
-        shadow-bias={-0.001}
-        shadow-mapSize={[512, 512]}
-      />
-      <pointLight 
-        position={[-10, 10, -10]} 
-        intensity={0.5} 
+        position={[15, 12, 15]} 
+        intensity={1.2} 
         color="#00ffff" 
         castShadow 
         shadow-bias={-0.001}
-        shadow-mapSize={[512, 512]}
       />
-      <pointLight position={[0, 15, 0]} intensity={0.3} color="#ffffff" />
+      <pointLight 
+        position={[-15, 12, -15]} 
+        intensity={1.2} 
+        color="#ff00ff" 
+        castShadow 
+        shadow-bias={-0.001}
+      />
+      <pointLight position={[0, 20, 0]} intensity={0.8} color="#ffffff" />
     </group>
   );
 }

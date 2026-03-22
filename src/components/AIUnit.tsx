@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, memo } from 'react';
+import { useRef, useState, useEffect, useMemo, memo, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -70,6 +70,8 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
   const [showCallout, setShowCallout] = useState(false);
   const calloutText = useRef("");
   const leanAngle = useRef(0);
+  const visualizerGroupRef = useRef<THREE.Group>(null);
+  const lineRef = useRef<any>(null);
 
   // Combat Configs based on Type
   const combatConfig = useMemo(() => {
@@ -863,15 +865,16 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
       {/* Callout Billboard */}
       {showCallout && (
         <Billboard position={[0, 2.5, 0]}>
-          <Text
-            fontSize={0.4}
-            color={team === 'A' ? "#4488ff" : "#ff4444"}
-            font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKbxmcZVE.woff"
-            anchorX="center"
-            anchorY="middle"
-          >
-            {calloutText.current}
-          </Text>
+          <Suspense fallback={null}>
+            <Text
+              fontSize={0.4}
+              color={team === 'A' ? "#4488ff" : "#ff4444"}
+              anchorX="center"
+              anchorY="middle"
+            >
+              {calloutText.current}
+            </Text>
+          </Suspense>
         </Billboard>
       )}
 

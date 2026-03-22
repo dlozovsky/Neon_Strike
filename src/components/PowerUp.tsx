@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Float, Text, Sphere, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
@@ -48,16 +48,17 @@ export function PowerUp({ id, type, position }: PowerUpProps) {
             opacity={0.8}
           />
         </Sphere>
-        <Text
-          position={[0, 1, 0]}
-          fontSize={0.4}
-          color="white"
-          font="https://fonts.gstatic.com/s/pressstart2p/v14/e3t4euO8J-y97nizJ0VZ9ALWpr3E.woff"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {config.icon}
-        </Text>
+        <Suspense fallback={null}>
+          <Text
+            position={[0, 1, 0]}
+            fontSize={0.4}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {config.icon}
+          </Text>
+        </Suspense>
       </Float>
       
       {/* Ground Glow */}

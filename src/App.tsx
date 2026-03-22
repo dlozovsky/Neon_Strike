@@ -1,7 +1,7 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, Suspense } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { KeyboardControls, Stars } from '@react-three/drei';
+import { KeyboardControls, Stars, Loader } from '@react-three/drei';
 import { Arena } from './components/Arena';
 import { Player } from './components/Player';
 import { AIUnit } from './components/AIUnit';
@@ -95,6 +95,8 @@ function GameScene() {
 }
 
 // Separate component to handle game logic without re-rendering the whole App
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 function GameController() {
   const gameStarted = useGameStore((state) => state.gameStarted);
   const timeLeft = useGameStore((state) => state.timeLeft);
@@ -119,29 +121,40 @@ export default function App() {
     <div className="w-full h-screen bg-black overflow-hidden relative">
       <GameController />
       <KeyboardControls map={keyboardMap}>
-        <Canvas 
-          shadows={{ type: THREE.PCFSoftShadowMap }}
-          camera={{ fov: 75, near: 0.1, far: 1000 }}
-          gl={{ 
-            antialias: true, 
-            alpha: false,
-            stencil: false,
-            powerPreference: "high-performance",
-            precision: "highp",
-            depth: true
-          }}
-        >
-          <color attach="background" args={['#050505']} />
-          <fog attach="fog" args={['#050505', 0, 300]} />
-          
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-          
-          <MemoizedArena />
-          <GameScene />
-        </Canvas>
-        
-        <HUD />
+        <ErrorBoundary>
+          <Canvas 
+            shadows
+            camera={{ position: [0, 20, 30], fov: 75, near: 0.1, far: 1000 }}
+            gl={{ antialias: true }}
+          >
+            <Suspense fallback={null}>
+              <color attach="background" args={['#020202']} />
+              <fog attach="fog" args={['#020202', 10, 150]} />
+              
+              <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+              
+              <ambientLight intensity={0.5} />
+              <directionalLight 
+                position={[10, 20, 10]} 
+                intensity={1.5} 
+                castShadow 
+                shadow-mapSize={[2048, 2048]}
+                shadow-camera-left={-30}
+                shadow-camera-right={30}
+                shadow-camera-top={30}
+                shadow-camera-bottom={-30}
+              />
+              <pointLight position={[0, 10, 0]} intensity={1} color="#00ffff" distance={30} />
+              
+              <MemoizedArena />
+              <GameScene />
+            </Suspense>
+          </Canvas>
+        </ErrorBoundary>
       </KeyboardControls>
+      
+      <HUD />
+      <Loader />
     </div>
   );
 }

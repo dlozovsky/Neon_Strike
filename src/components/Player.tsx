@@ -181,7 +181,9 @@ export const Player = memo(function Player() {
     const currentSpeed = activePowerUps.SPEED ? SPEED * 1.6 : SPEED;
     direction.current.z = Number(forward) - Number(backward);
     direction.current.x = Number(right) - Number(left);
-    direction.current.normalize();
+    if (direction.current.lengthSq() > 0) {
+      direction.current.normalize();
+    }
 
     if (forward || backward) velocity.current.z -= direction.current.z * currentSpeed * delta;
     if (left || right) velocity.current.x -= direction.current.x * currentSpeed * delta;
