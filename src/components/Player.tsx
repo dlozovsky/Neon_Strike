@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, memo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,24 +9,19 @@ import { soundManager } from '../services/soundService';
 const SPEED = 5;
 const PLAYER_RADIUS = 0.5;
 
-export function Player() {
+export const Player = memo(function Player() {
   const [, getKeys] = useKeyboardControls();
   const camera = useThree((state) => state.camera);
   const scene = useThree((state) => state.scene);
-  const { 
-    isPlayerDisabled, 
-    incrementScore, 
-    respawnRequested, 
-    triggerHitMarker, 
-    updatePlayerTransform, 
-    playerTeam,
-    activePowerUps,
-    isSpectating,
-    spectatorTargetId,
-    opponents,
-    playerPos,
-    playerYaw
-  } = useGameStore();
+  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
+  const incrementScore = useGameStore(state => state.incrementScore);
+  const respawnRequested = useGameStore(state => state.respawnRequested);
+  const triggerHitMarker = useGameStore(state => state.triggerHitMarker);
+  const updatePlayerTransform = useGameStore(state => state.updatePlayerTransform);
+  const playerTeam = useGameStore(state => state.playerTeam);
+  const activePowerUps = useGameStore(state => state.activePowerUps);
+  const isSpectating = useGameStore(state => state.isSpectating);
+  const spectatorTargetId = useGameStore(state => state.spectatorTargetId);
   
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
@@ -101,44 +96,15 @@ export function Player() {
     const intersects = raycaster.current.intersectObjects(scene.children, true);
 
     if (intersects.length > 0) {
-      for (const hit of intersects) {
-        let obj: THREE.Object3D | null = hit.object;
-        let isOpponent = false;
-        let isPlayerWeapon = false;
-        let isWall = false;
-        
-        while (obj) {
-          if (obj.userData) {
-            if (obj.userData.isOpponent) isOpponent = true;
-            if (obj.userData.isPlayerWeapon) isPlayerWeapon = true;
-            if (obj.userData.isWall) isWall = true;
-          }
-          if (isOpponent || isPlayerWeapon || isWall) break;
-          obj = obj.parent;
+      const hit = intersects[0];
+      // Check if we hit an opponent
+      if (hit.object.userData.isOpponent && !hit.object.userData.isDisabled) {
+        // Friendly fire check
+        if (hit.object.userData.team !== playerTeam) {
+          hit.object.userData.onHit();
+          incrementScore();
+          triggerHitMarker();
         }
-
-        if (isPlayerWeapon) {
-          continue; // Ignore player's own weapons/shield and keep checking
-        }
-
-        if (isWall) {
-          break; // Hit a wall, stop checking
-        }
-
-        // Check if we hit an opponent
-        if (isOpponent && obj) {
-          if (!obj.userData.isDisabled) {
-            // Friendly fire check
-            if (obj.userData.team !== playerTeam) {
-              obj.userData.onHit();
-              incrementScore();
-              triggerHitMarker();
-            }
-          }
-          break; // Stop checking after hitting an opponent (even if disabled or friendly)
-        }
-        
-        // If it's none of the above (e.g. floor, health bar, laser beam), ignore it and keep checking
       }
     }
   };
@@ -155,12 +121,16 @@ export function Player() {
 
   useEffect(() => {
     if (!isSpectating) {
-      camera.position.set(playerPos[0], playerPos[1], playerPos[2]);
-      camera.rotation.set(0, playerYaw, 0);
+      const state = useGameStore.getState();
+      camera.position.set(state.playerPos[0], state.playerPos[1], state.playerPos[2]);
+      camera.rotation.set(0, state.playerYaw, 0);
     }
-  }, [isSpectating]);
+  }, [isSpectating, camera]);
 
   useFrame((state, delta) => {
+    const gameState = useGameStore.getState();
+    const opponents = gameState.opponents;
+
     if (isSpectating) {
       // Spectator Camera Logic
       let targetPos = new THREE.Vector3();
@@ -179,11 +149,15 @@ export function Player() {
         const opp = opponents[spectatorTargetId];
         if (opp) {
           targetPos.set(opp.pos[0], opp.pos[1], opp.pos[2]);
-          // Chase camera offset
-          const offset = new THREE.Vector3(0, 2, 5);
-          // We don't have the opponent's yaw easily in the store yet, but we can look at them
+          // Improved Chase camera: Higher and slightly back
+          const offset = new THREE.Vector3(0, 6, 10);
           const camTarget = targetPos.clone();
           const camPos = targetPos.clone().add(offset);
+          
+          // Clamp camera position within arena bounds to avoid clipping into walls
+          const limit = ARENA_SIZE / 2 - 2;
+          camPos.x = Math.max(-limit, Math.min(limit, camPos.x));
+          camPos.z = Math.max(-limit, Math.min(limit, camPos.z));
           
           camera.position.lerp(camPos, 0.1);
           camera.lookAt(camTarget);
@@ -237,28 +211,30 @@ export function Player() {
       laserRef.current.translateZ(0.2); // Slightly down
     }
 
-    // Update store for minimap
-    updatePlayerTransform(
-      [camera.position.x, camera.position.y, camera.position.z],
-      camera.rotation.y
-    );
+    // Update store for minimap (throttled to every 3 frames)
+    if (state.clock.elapsedTime * 60 % 3 < 1) {
+      updatePlayerTransform(
+        [camera.position.x, camera.position.y, camera.position.z],
+        camera.rotation.y
+      );
+    }
   });
 
   return (
     <>
       {!isSpectating && <PointerLockControls />}
       {laserActive && (
-        <mesh ref={laserRef} userData={{ isPlayerWeapon: true }}>
+        <mesh ref={laserRef}>
           <cylinderGeometry args={[0.01, 0.01, 100]} />
           <meshBasicMaterial color={activePowerUps.RAPID_FIRE ? "#ff00ff" : "#00ffff"} transparent opacity={0.8} />
         </mesh>
       )}
       {activePowerUps.SHIELD && activePowerUps.SHIELD > 0 && (
-        <mesh position={[0, 0, -1]} rotation={[0, 0, 0]} userData={{ isPlayerWeapon: true }}>
+        <mesh position={[0, 0, -1]} rotation={[0, 0, 0]}>
           <sphereGeometry args={[2, 32, 32]} />
           <meshBasicMaterial color="#ffff00" transparent opacity={0.1} wireframe />
         </mesh>
       )}
     </>
   );
-}
+});

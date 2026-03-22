@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ interface OpponentProps {
 
 type AIState = 'patrol' | 'chase' | 'flank' | 'seekCover' | 'attack' | 'guardPlayer' | 'coordinateAttack' | 'peek';
 
-export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
+export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const [health, setHealth] = useState(100);
@@ -26,7 +26,15 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
   const [hitFlash, setHitFlash] = useState(false);
   const [targetPos, setTargetPos] = useState(new THREE.Vector3(...initialPosition));
   const currentWaypointIndex = useRef(0);
-  const { score, hitsReceived, playerHit, isPlayerDisabled, updateOpponent, opponents, playerPos: playerPosStore, playerTeam, hitMarkerActive, incrementTeamScore } = useGameStore();
+  const score = useGameStore(state => state.score);
+  const hitsReceived = useGameStore(state => state.hitsReceived);
+  const playerHit = useGameStore(state => state.playerHit);
+  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
+  const updateOpponent = useGameStore(state => state.updateOpponent);
+  const playerTeam = useGameStore(state => state.playerTeam);
+  const hitMarkerActive = useGameStore(state => state.hitMarkerActive);
+  const incrementTeamScore = useGameStore(state => state.incrementTeamScore);
+  const updateTacticalData = useGameStore(state => state.updateTacticalData);
   
   // Dynamic Difficulty Factor (0.6 to 1.5)
   const difficultyFactor = useMemo(() => {
@@ -57,7 +65,11 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
   const peekDistance = useRef(1.5);
   const lastPeekSide = useRef(1); // 1 or -1
   const currentMoveTarget = useRef(new THREE.Vector3());
+  const distToPlayerRef = useRef(0);
   const [visualState, setVisualState] = useState<AIState>('patrol');
+  const [showCallout, setShowCallout] = useState(false);
+  const calloutText = useRef("");
+  const leanAngle = useRef(0);
 
   // Combat Configs based on Type
   const combatConfig = useMemo(() => {
@@ -103,9 +115,12 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     if (isDisabled) return;
     
     setIsFlashing(true);
-    setTimeout(() => setIsFlashing(false), 100);
+    setTimeout(() => setIsFlashing(false), 70);
     
-    soundManager.play('HIT_AI', 0.5);
+    const volume = Math.max(0, 0.5 * (1 - distToPlayerRef.current / 30));
+    if (volume > 0.05) {
+      soundManager.play('HIT_AI', volume);
+    }
     lastHitTime.current = Date.now();
     
     // Immediate reaction to being hit
@@ -169,24 +184,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         let isProtected = false;
 
         if (intersects.length > 0) {
-          for (const hit of intersects) {
-            if (hit.distance > targetPos.distanceTo(testPos)) continue;
-            
-            let obj: THREE.Object3D | null = hit.object;
-            let isWall = false;
-            while (obj) {
-              if (obj.userData && obj.userData.isWall) {
-                isWall = true;
-                break;
-              }
-              obj = obj.parent;
-            }
-            
-            if (isWall) {
-              hasLOS = false;
-              isProtected = true;
-              break;
-            }
+          const hit = intersects[0];
+          if (hit.object.userData.isWall && hit.distance < targetPos.distanceTo(testPos)) {
+            hasLOS = false;
+            isProtected = true;
           }
         }
 
@@ -197,30 +198,21 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         if (isProtected) score += 50; // Good, we are hidden
         
         // 3. Check if we can see the target from a SLIGHT offset (peeking potential)
-        const peekTestPos = testPos.clone().add(dirToTarget.clone().cross(new THREE.Vector3(0, 1, 0)).multiplyScalar(1.5));
-        raycaster.set(peekTestPos, v2.subVectors(targetPos, peekTestPos).normalize());
-        const peekIntersects = raycaster.intersectObjects(scene.children, true);
+        // Check both sides
+        const right = v2.copy(dirToTarget).cross(new THREE.Vector3(0, 1, 0)).normalize();
         
-        let canPeek = true;
-        for (const hit of peekIntersects) {
-          if (hit.distance > targetPos.distanceTo(peekTestPos)) continue;
-          
-          let obj: THREE.Object3D | null = hit.object;
-          let isWall = false;
-          while (obj) {
-            if (obj.userData && obj.userData.isWall) {
-              isWall = true;
-              break;
-            }
-            obj = obj.parent;
-          }
-          if (isWall) {
-            canPeek = false;
-            break;
-          }
-        }
+        const peekRight = testPos.clone().add(right.clone().multiplyScalar(1.5));
+        raycaster.set(peekRight, v2.subVectors(targetPos, peekRight).normalize());
+        const rightIntersects = raycaster.intersectObjects(scene.children, true);
+        const canPeekRight = rightIntersects.length === 0 || !rightIntersects[0].object.userData.isWall;
+
+        const peekLeft = testPos.clone().add(right.clone().multiplyScalar(-1.5));
+        raycaster.set(peekLeft, v2.subVectors(targetPos, peekLeft).normalize());
+        const leftIntersects = raycaster.intersectObjects(scene.children, true);
+        const canPeekLeft = leftIntersects.length === 0 || !leftIntersects[0].object.userData.isWall;
         
-        if (canPeek) score += 30;
+        if (canPeekRight || canPeekLeft) score += 30;
+        if (canPeekRight && canPeekLeft) score += 10; // Extra points for multiple peek options
 
         if (score > maxScore) {
           maxScore = score;
@@ -235,45 +227,17 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     if (!groupRef.current) return false;
     const origin = groupRef.current.position.clone().add(v1.set(0, 0.5, 0));
     const dir = v2.subVectors(targetPos, origin).normalize();
-    const distToTarget = targetPos.distanceTo(origin);
-    
     raycaster.set(origin, dir);
     const intersects = raycaster.intersectObjects(scene.children, true);
     
-    for (const hit of intersects) {
-      // Ignore hits that are further than the target
-      if (hit.distance > distToTarget + 1) continue;
-
-      let obj: THREE.Object3D | null = hit.object;
-      let isOpponent = false;
-      let isWall = false;
-      let teamId = null;
-      let objId = null;
-
-      while (obj) {
-        if (obj.userData) {
-          if (obj.userData.isOpponent) {
-            isOpponent = true;
-            teamId = obj.userData.team;
-            objId = obj.userData.id;
-          }
-          if (obj.userData.isWall) isWall = true;
-        }
-        if (isOpponent || isWall) break;
-        obj = obj.parent;
-      }
-
-      if (isWall) return false;
-      if (isOpponent) {
-        if (objId === id) continue; // Ignore self
-        if (teamId === team) return false; // Friendly fire
-        // If it's an enemy, we have LOS
-        return true;
-      }
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      if (hit.object.userData.isWall) return false;
+      // Friendly fire check: if we hit a teammate, don't shoot
+      if (hit.object.userData.isOpponent && hit.object.userData.team === team) return false;
+      return true;
     }
-    
-    // If nothing blocked the ray before reaching the target, we have LOS
-    return true;
+    return false;
   };
 
   useFrame((stateObj, delta) => {
@@ -287,8 +251,13 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     playerUnderFireTimer.current = Math.max(0, playerUnderFireTimer.current - delta);
 
     // Find nearest enemy
+    const state = useGameStore.getState();
+    const opponents = state.opponents;
+    const tacticalData = state.tacticalData;
+    
     const playerPos = stateObj.camera.position;
     const distToPlayer = groupRef.current.position.distanceTo(playerPos);
+    distToPlayerRef.current = distToPlayer;
     let nearestEnemyPos = playerPos.clone();
     let minDist = distToPlayer;
     let targetIsPlayer = true;
@@ -380,7 +349,37 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     // Calculate lead position
     const projectileSpeed = 20;
     const leadTime = distToTarget / projectileSpeed;
-    const predictedPos = v3.copy(nearestEnemyPos).add(playerVelocity.current.clone().multiplyScalar(leadTime));
+
+    // --- Coordination Logic ---
+    const hasLOS = checkLOS(nearestEnemyPos, stateObj.scene);
+    
+    // Broadcast LOS to teammates
+    if (hasLOS && !isDisabled && !isTeammate) {
+      const now = Date.now();
+      if (now - tacticalData.lastSpottedTime > 1000 || !tacticalData.lastSpottedPlayerPos) {
+        updateTacticalData({
+          lastSpottedPlayerPos: [nearestEnemyPos.x, nearestEnemyPos.y, nearestEnemyPos.z],
+          lastSpottedTime: now
+        });
+        
+        // Visual Callout
+        if (!showCallout) {
+          calloutText.current = type === 'sniper' ? "Target acquired!" : "Enemy spotted!";
+          setShowCallout(true);
+          setTimeout(() => setShowCallout(false), 2000);
+        }
+      }
+    }
+
+    // React to teammate callouts if we don't have LOS
+    let effectiveTargetPos = nearestEnemyPos.clone();
+    const spottedRecently = tacticalData.lastSpottedPlayerPos && (Date.now() - tacticalData.lastSpottedTime < 5000);
+    
+    if (!hasLOS && spottedRecently && !isTeammate) {
+      effectiveTargetPos.set(...tacticalData.lastSpottedPlayerPos!);
+    }
+
+    const predictedPos = v3.copy(effectiveTargetPos).add(playerVelocity.current.clone().multiplyScalar(leadTime));
 
     // State Transitions
     if (distToTarget < 20 || aiState.current === 'guardPlayer' || aiState.current === 'coordinateAttack') {
@@ -428,38 +427,55 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     let currentTarget = targetPos;
 
     // Special transition for peeking
-    if (aiState.current === 'seekCover' && groupRef.current.position.distanceTo(currentTarget) < 0.5) {
-      const peekCooldown = type === 'sniper' ? 2.5 : type === 'aggressive' ? 0.8 : 1.5;
-      if (stateTimer.current > peekCooldown && Math.random() > 0.3) {
+    if (aiState.current === 'seekCover' && groupRef.current.position.distanceTo(currentTarget) < 0.8) {
+      const peekCooldown = type === 'sniper' ? 1.5 : type === 'aggressive' ? 0.4 : 0.8;
+      if (stateTimer.current > peekCooldown && Math.random() > 0.2) {
         aiState.current = 'peek';
         stateTimer.current = 0;
         coverBasePos.current.copy(groupRef.current.position);
         
         // Dynamic peek parameters
-        peekDuration.current = type === 'sniper' ? 1.5 + Math.random() : 0.5 + Math.random() * 0.8;
-        peekDistance.current = 1.2 + Math.random() * 0.8;
+        peekDuration.current = type === 'sniper' ? 2.0 + Math.random() : 0.8 + Math.random() * 1.2;
+        peekDistance.current = 1.5 + Math.random() * 0.5;
         
-        // Choose side (maybe switch from last time)
-        if (Math.random() > 0.7) lastPeekSide.current *= -1;
-        
-        // Calculate peek direction (perpendicular to target)
+        // Choose side: Check which side gives better LOS
         const dirToTarget = v1.subVectors(nearestEnemyPos, groupRef.current.position).normalize();
-        peekOffset.current.copy(dirToTarget).cross(new THREE.Vector3(0, 1, 0)).multiplyScalar(peekDistance.current * lastPeekSide.current);
+        const right = v2.copy(dirToTarget).cross(new THREE.Vector3(0, 1, 0)).normalize();
+        
+        // Test right side
+        const testRight = groupRef.current.position.clone().add(right.clone().multiplyScalar(2));
+        const hasRightLOS = checkLOS(nearestEnemyPos, stateObj.scene); // Simplified check
+        
+        // Test left side
+        const testLeft = groupRef.current.position.clone().add(right.clone().multiplyScalar(-2));
+        // Actually, let's just alternate or choose based on a simple raycast
+        if (Math.random() > 0.5) lastPeekSide.current *= -1;
+        
+        peekOffset.current.copy(right).multiplyScalar(peekDistance.current * lastPeekSide.current);
         isPeekingOut.current = true;
       }
     }
 
+    // Reset lean if not peeking
+    if (aiState.current !== 'peek') {
+      leanAngle.current = THREE.MathUtils.lerp(leanAngle.current, 0, 0.1);
+    }
+
     switch (aiState.current) {
       case 'peek':
-        moveSpeed = 2.5 * (0.8 + difficultyFactor * 0.2);
+        moveSpeed = 3.5 * (0.8 + difficultyFactor * 0.2);
         if (isPeekingOut.current) {
           currentTarget = coverBasePos.current.clone().add(peekOffset.current);
           
           // If we have LOS, we might stay a bit longer to fire
           const hasLOS = checkLOS(predictedPos, stateObj.scene);
-          const currentPeekDuration = hasLOS ? peekDuration.current : peekDuration.current * 0.5;
+          const currentPeekDuration = hasLOS ? peekDuration.current : peekDuration.current * 0.3;
 
-          if (groupRef.current.position.distanceTo(currentTarget) < 0.2) {
+          // Visual Leaning
+          const targetLean = lastPeekSide.current * 0.3;
+          leanAngle.current = THREE.MathUtils.lerp(leanAngle.current, targetLean, 0.1);
+
+          if (groupRef.current.position.distanceTo(currentTarget) < 0.3) {
             // Reached peek position, stay for dynamic duration then go back
             if (stateTimer.current > currentPeekDuration) {
               isPeekingOut.current = false;
@@ -467,7 +483,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
           }
         } else {
           currentTarget = coverBasePos.current.clone();
-          if (groupRef.current.position.distanceTo(currentTarget) < 0.2) {
+          // Visual Leaning reset
+          leanAngle.current = THREE.MathUtils.lerp(leanAngle.current, 0, 0.1);
+          
+          if (groupRef.current.position.distanceTo(currentTarget) < 0.3) {
             aiState.current = 'seekCover';
             stateTimer.current = 0;
           }
@@ -475,35 +494,64 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         break;
       case 'guardPlayer':
         // Position between player and enemy
-        const dirToEnemy = v1.subVectors(nearestEnemyPos, playerPos).normalize();
+        const dirToEnemy = v1.subVectors(effectiveTargetPos, playerPos).normalize();
         currentTarget = playerPos.clone().add(dirToEnemy.multiplyScalar(3));
         moveSpeed = 4 * (0.8 + difficultyFactor * 0.2); // Rush to protect
         break;
       case 'coordinateAttack':
         // Move towards player's target but keep distance
-        currentTarget = nearestEnemyPos.clone();
+        currentTarget = effectiveTargetPos.clone();
         moveSpeed = 2.5 * (0.8 + difficultyFactor * 0.2);
         if (score > 500) moveSpeed *= 1.3; // More aggressive if player is doing well
         break;
       case 'chase':
-        currentTarget = nearestEnemyPos.clone();
-        moveSpeed = 3 * (0.8 + difficultyFactor * 0.2);
+        moveSpeed = 4.5 * (0.8 + difficultyFactor * 0.2);
+        // If teammate is already chasing, maybe we flank instead
+        const otherTeammates = Object.values(opponents).filter(o => o.id !== id && o.team === team && !o.isDisabled);
+        const teammateChasing = otherTeammates.some(o => o.id in tacticalData.activeManeuvers && tacticalData.activeManeuvers[o.id] === 'CHASE');
+        
+        if (teammateChasing && Math.random() > 0.5) {
+          aiState.current = 'flank';
+          stateTimer.current = 0;
+        } else {
+          currentTarget = effectiveTargetPos.clone();
+          if (distToTarget < 10) aiState.current = 'attack';
+        }
         break;
+
       case 'flank':
-        const dirToTarget = v1.subVectors(nearestEnemyPos, groupRef.current.position).normalize();
-        const flankDir = dirToTarget.clone().applyAxisAngle(v2.set(0, 1, 0), flankAngle.current);
-        currentTarget = groupRef.current.position.clone().add(flankDir.multiplyScalar(5));
-        moveSpeed = 2.5 * (0.8 + difficultyFactor * 0.2);
+        moveSpeed = 5.0 * (0.8 + difficultyFactor * 0.2);
+        // Coordinate flanking angles
+        const flankingTeammates = Object.values(opponents).filter(o => o.id !== id && o.team === team && !o.isDisabled && tacticalData.activeManeuvers[o.id] === 'FLANK');
+        if (flankingTeammates.length > 0 && stateTimer.current < 0.1) {
+          // If another teammate is flanking, choose the opposite side
+          flankAngle.current = -flankAngle.current;
+        }
+
+        const dirToPlayer = v1.subVectors(effectiveTargetPos, groupRef.current.position).normalize();
+        const flankDir = v2.copy(dirToPlayer).applyAxisAngle(new THREE.Vector3(0, 1, 0), flankAngle.current);
+        currentTarget = groupRef.current.position.clone().add(flankDir.multiplyScalar(8));
+        
+        if (hasLOS && distToTarget < 15) aiState.current = 'attack';
+        if (stateTimer.current > 5) aiState.current = 'seekCover';
         break;
       case 'seekCover':
         currentTarget = findCover(nearestEnemyPos, stateObj.scene);
         moveSpeed = 3.5 * (0.8 + difficultyFactor * 0.2);
         break;
       case 'attack':
-        const strafeDir = v1.subVectors(nearestEnemyPos, groupRef.current.position).normalize();
-        strafeDir.applyAxisAngle(v2.set(0, 1, 0), Math.PI / 2);
-        currentTarget = groupRef.current.position.clone().add(strafeDir.multiplyScalar(Math.sin(stateTimer.current * 2) * 2));
-        moveSpeed = 1 * (0.8 + difficultyFactor * 0.2);
+        const strafeDir = v1.subVectors(effectiveTargetPos, groupRef.current.position).normalize();
+        
+        // Coordination: If teammate is already attacking from one side, try to move to the other
+        const attackingTeammates = Object.values(opponents).filter(o => o.id !== id && o.team === team && !o.isDisabled && tacticalData.activeManeuvers[o.id] === 'ATTACK');
+        let strafeAngle = Math.PI / 2;
+        if (attackingTeammates.length > 0) {
+          strafeAngle = Math.PI / 1.5; // Wider angle for crossfire
+        }
+
+        strafeDir.applyAxisAngle(v2.set(0, 1, 0), strafeAngle);
+        currentTarget = groupRef.current.position.clone().add(strafeDir.multiplyScalar(Math.sin(stateTimer.current * 2) * 3));
+        moveSpeed = 1.5 * (0.8 + difficultyFactor * 0.2);
         break;
       case 'patrol':
         if (groupRef.current.position.distanceTo(targetPos) < 1.5) {
@@ -525,23 +573,26 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         break;
     }
 
+    // Update active maneuvers in store
+    if (stateTimer.current % 10 === 0) { // Throttle updates
+      updateTacticalData({
+        activeManeuvers: {
+          ...tacticalData.activeManeuvers,
+          [id]: aiState.current.toUpperCase()
+        }
+      });
+    }
+
     // Movement
     groupRef.current.lookAt(predictedPos.x, 1, predictedPos.z);
+    meshRef.current.rotation.z = leanAngle.current;
     let moveDir = v1.subVectors(currentTarget, groupRef.current.position).normalize();
     
     // --- Obstacle Avoidance ---
     // Cast a ray in the movement direction to detect walls/obstacles
     raycaster.set(groupRef.current.position, moveDir);
     const obstacles = raycaster.intersectObjects(stateObj.scene.children, true)
-      .filter(hit => {
-        if (hit.distance >= 3) return false;
-        let obj: THREE.Object3D | null = hit.object;
-        while (obj) {
-          if (obj.userData && obj.userData.isWall) return true;
-          obj = obj.parent;
-        }
-        return false;
-      });
+      .filter(hit => hit.object.userData.isWall && hit.distance < 3);
 
     if (obstacles.length > 0) {
       // Calculate a steering force away from the obstacle
@@ -582,10 +633,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
 
     // Attack Patterns
     const now = Date.now();
-    const hasLOS = checkLOS(predictedPos, stateObj.scene);
+    const hasLOSAttack = checkLOS(predictedPos, stateObj.scene);
     
     // Reaction Logic: Reset reaction timer if LOS is lost
-    if (!hasLOS) {
+    if (!hasLOSAttack) {
       reactionTimer.current = 0;
       hasLOSLastFrame.current = false;
     } else {
@@ -608,9 +659,16 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     const hasReacted = reactionTimer.current >= combatConfig.reactionTime;
     const canShootInState = aiState.current !== 'patrol' && (aiState.current !== 'peek' || isPeekingOut.current);
 
-    if (now - lastShotTime.current > cooldown && distToTarget < combatConfig.maxDist && canShootInState && hasLOS && hasReacted) {
+    if (now - lastShotTime.current > cooldown && distToTarget < combatConfig.maxDist && canShootInState && hasLOSAttack && hasReacted) {
+      // Suppression Callout
+      if (Math.random() > 0.8 && !showCallout) {
+        calloutText.current = "Suppressing!";
+        setShowCallout(true);
+        setTimeout(() => setShowCallout(false), 1500);
+      }
+
       // Play AI laser sound
-      const volume = Math.max(0, 0.4 * (1 - distToTarget / 30));
+      const volume = Math.max(0, 0.25 * (1 - distToPlayer / 30));
       soundManager.play('AI_LASER', volume);
 
       // Trigger visual laser
@@ -634,35 +692,10 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
             raycaster.set(groupRef.current!.position.clone().add(v1.set(0, 0.5, 0)), v2.subVectors(predictedPos, groupRef.current!.position).normalize());
             const intersects = raycaster.intersectObjects(stateObj.scene.children, true);
             if (intersects.length > 0) {
-              for (const hit of intersects) {
-                let obj: THREE.Object3D | null = hit.object;
-                let isOpponent = false;
-                let isWall = false;
-                
-                while (obj) {
-                  if (obj.userData) {
-                    if (obj.userData.isOpponent) isOpponent = true;
-                    if (obj.userData.isWall) isWall = true;
-                  }
-                  if (isOpponent || isWall) break;
-                  obj = obj.parent;
-                }
-
-                if (isWall) break;
-
-                if (isOpponent && obj && obj.userData.onHit) {
-                  // Don't shoot ourselves
-                  if (obj.userData.id === id) {
-                    continue; // Ignore self and keep checking
-                  }
-                  
-                  if (!obj.userData.isDisabled) {
-                    // Hit another opponent
-                    obj.userData.onHit();
-                    incrementTeamScore(team); // AI unit's team gets score
-                  }
-                  break; // Stop checking after hitting an opponent (even if disabled)
-                }
+              const hit = intersects[0];
+              if (hit.object.userData.isOpponent && hit.object.userData.onHit) {
+                hit.object.userData.onHit();
+                incrementTeamScore(team); // AI unit's team gets score
               }
             }
           }
@@ -693,18 +726,19 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       isOpponent: true,
       isDisabled,
       onHit,
-      team,
-      id
+      team
     };
 
-    // Update store for minimap
-    updateOpponent(id, {
-      id,
-      pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
-      type,
-      isDisabled,
-      team
-    });
+    // Update store for minimap (throttled to every 3 frames)
+    if (stateObj.clock.elapsedTime * 60 % 3 < 1) {
+      updateOpponent(id, {
+        id,
+        pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
+        type,
+        isDisabled,
+        team
+      });
+    }
   });
 
   const stateColors: Record<AIState, string> = {
@@ -824,20 +858,35 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       {/* Hit Confirmation Flash */}
       {hitFlash && (
         <group position={[0, 0.5, 0.6]}>
-          <pointLight distance={5} intensity={10} color="#ffffff" />
+          <pointLight distance={5} intensity={3} color="#ffffff" />
           <mesh>
-            <sphereGeometry args={[0.3, 16, 16]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.8} />
+            <sphereGeometry args={[0.2, 16, 16]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.4} />
           </mesh>
         </group>
+      )}
+
+      {/* Callout Billboard */}
+      {showCallout && (
+        <Billboard position={[0, 2.5, 0]}>
+          <Text
+            fontSize={0.4}
+            color={team === 'A' ? "#4488ff" : "#ff4444"}
+            font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKbxmcZVE.woff"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {calloutText.current}
+          </Text>
+        </Billboard>
       )}
 
       <mesh ref={meshRef} castShadow>
         <boxGeometry args={[1, 2, 1]} />
         <meshStandardMaterial 
-          color={isFlashing ? "#ffffff" : isDisabled ? "#333" : team === 'A' ? "#0088ff" : "#ff4400"} 
+          color={isFlashing ? (team === 'A' ? "#88ccff" : "#ffaa88") : isDisabled ? "#333" : team === 'A' ? "#0088ff" : "#ff4400"} 
           emissive={isFlashing ? "#ffffff" : isDisabled ? "#000" : team === 'A' ? "#0088ff" : "#ff4400"}
-          emissiveIntensity={isFlashing ? 1 : isDisabled ? 0 : 0.5}
+          emissiveIntensity={isFlashing ? 0.8 : isDisabled ? 0 : 0.2}
         />
         {/* Team Indicator Light */}
         <mesh position={[0, 0.8, 0.51]}>
@@ -852,5 +901,5 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       </mesh>
     </group>
   </>
-);
-}
+  );
+});
