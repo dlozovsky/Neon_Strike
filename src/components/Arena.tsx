@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { useMemo } from 'react';
+import { memo } from 'react';
+import { Edges } from '@react-three/drei';
 
 export const ARENA_SIZE = 50;
 export const WALL_HEIGHT = 6;
@@ -15,21 +16,15 @@ export const OBSTACLES = [
   { pos: [-20, 0, 0], size: [2, 4, 8] },
 ];
 
-const Obstacle = ({ obs }: { obs: typeof OBSTACLES[0] }) => {
-  const geometry = useMemo(() => new THREE.BoxGeometry(obs.size[0], obs.size[1], obs.size[2]), [obs.size]);
-  const edges = useMemo(() => new THREE.EdgesGeometry(geometry), [geometry]);
-
+const Obstacle = memo(({ obs }: { obs: typeof OBSTACLES[0] }) => {
   return (
-    <mesh position={[obs.pos[0] as number, (obs.pos[1] as number) + (obs.size[1] as number) / 2, obs.pos[2] as number]} castShadow receiveShadow userData={{ isWall: true }} frustumCulled={false}>
-      <primitive object={geometry} attach="geometry" />
+    <mesh position={[obs.pos[0] as number, (obs.pos[1] as number) + (obs.size[1] as number) / 2, obs.pos[2] as number]} castShadow receiveShadow userData={{ isWall: true }}>
+      <boxGeometry args={[obs.size[0], obs.size[1], obs.size[2]]} />
       <meshStandardMaterial color="#222" emissive="#00ffff" emissiveIntensity={0.05} />
-      <lineSegments frustumCulled={false}>
-        <primitive object={edges} attach="geometry" />
-        <lineBasicMaterial color="#00ffff" />
-      </lineSegments>
+      <Edges color="#00ffff" />
     </mesh>
   );
-};
+});
 
 export function Arena() {
   return (
@@ -44,19 +39,19 @@ export function Arena() {
       <gridHelper args={[ARENA_SIZE, 50, "#00ffff", "#002222"]} position={[0, -0.005, 0]} />
 
       {/* Walls */}
-      <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
+      <mesh position={[0, WALL_HEIGHT / 2, ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[0, WALL_HEIGHT / 2, -ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
+      <mesh position={[0, WALL_HEIGHT / 2, -ARENA_SIZE / 2]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
+      <mesh position={[ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>
-      <mesh position={[-ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }} frustumCulled={false}>
+      <mesh position={[-ARENA_SIZE / 2, WALL_HEIGHT / 2, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow castShadow userData={{ isWall: true }}>
         <boxGeometry args={[ARENA_SIZE, WALL_HEIGHT, 0.5]} />
         <meshStandardMaterial color="#111" />
       </mesh>

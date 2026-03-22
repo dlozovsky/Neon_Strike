@@ -70,6 +70,9 @@ export const Player = memo(function Player() {
 
     camera.position.copy(newPos);
     velocity.current.set(0, 0, 0);
+    
+    // Update store so exiting spectator mode returns to this valid position
+    updatePlayerTransform([newPos.x, newPos.y, newPos.z], camera.rotation.y);
   };
 
   useEffect(() => {
