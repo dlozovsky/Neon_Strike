@@ -72,7 +72,8 @@ export const useGameStore = create<GameState>((set) => ({
   spectatorTargetId: 'player',
   incrementScore: () => set((state) => ({ 
     score: state.score + 100,
-    teamAScore: state.teamAScore + 100
+    teamAScore: state.playerTeam === 'A' ? state.teamAScore + 100 : state.teamAScore,
+    teamBScore: state.playerTeam === 'B' ? state.teamBScore + 100 : state.teamBScore
   })),
   incrementTeamScore: (team) => set((state) => ({
     teamAScore: team === 'A' ? state.teamAScore + 100 : state.teamAScore,
@@ -88,7 +89,8 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => ({ 
       hitsReceived: state.hitsReceived + 1,
       isPlayerDisabled: true,
-      teamBScore: state.teamBScore + 100 // Enemy team gets score for hitting player
+      teamAScore: state.playerTeam === 'B' ? state.teamAScore + 100 : state.teamAScore,
+      teamBScore: state.playerTeam === 'A' ? state.teamBScore + 100 : state.teamBScore
     }));
     
     soundManager.play('HIT_PLAYER', 0.8);

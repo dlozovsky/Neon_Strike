@@ -4,16 +4,21 @@ import { PowerUp } from './PowerUp';
 import { ARENA_SIZE, OBSTACLES } from './Arena';
 
 export function PowerUpManager() {
-  const { spawnedPowerUps, spawnPowerUp, gameStarted, timeLeft } = useGameStore();
+  const spawnedPowerUps = useGameStore(state => state.spawnedPowerUps);
+  const spawnPowerUp = useGameStore(state => state.spawnPowerUp);
+  const gameStarted = useGameStore(state => state.gameStarted);
   const lastSpawnTime = useRef(0);
 
   useEffect(() => {
-    if (!gameStarted || timeLeft <= 0) return;
+    if (!gameStarted) return;
 
     const interval = setInterval(() => {
+      const state = useGameStore.getState();
+      if (state.timeLeft <= 0) return;
+
       // Spawn every 15-25 seconds
       const now = Date.now();
-      if (now - lastSpawnTime.current > 15000 && spawnedPowerUps.length < 3) {
+      if (now - lastSpawnTime.current > 15000 && state.spawnedPowerUps.length < 3) {
         const types: PowerUpType[] = ['SPEED', 'RAPID_FIRE', 'SHIELD'];
         const type = types[Math.floor(Math.random() * types.length)];
         
@@ -49,7 +54,7 @@ export function PowerUpManager() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [gameStarted, timeLeft, spawnedPowerUps.length, spawnPowerUp]);
+  }, [gameStarted, spawnedPowerUps.length, spawnPowerUp]);
 
   return (
     <>

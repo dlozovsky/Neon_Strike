@@ -101,15 +101,44 @@ export function Player() {
     const intersects = raycaster.current.intersectObjects(scene.children, true);
 
     if (intersects.length > 0) {
-      const hit = intersects[0];
-      // Check if we hit an opponent
-      if (hit.object.userData.isOpponent && !hit.object.userData.isDisabled) {
-        // Friendly fire check
-        if (hit.object.userData.team !== playerTeam) {
-          hit.object.userData.onHit();
-          incrementScore();
-          triggerHitMarker();
+      for (const hit of intersects) {
+        let obj: THREE.Object3D | null = hit.object;
+        let isOpponent = false;
+        let isPlayerWeapon = false;
+        let isWall = false;
+        
+        while (obj) {
+          if (obj.userData) {
+            if (obj.userData.isOpponent) isOpponent = true;
+            if (obj.userData.isPlayerWeapon) isPlayerWeapon = true;
+            if (obj.userData.isWall) isWall = true;
+          }
+          if (isOpponent || isPlayerWeapon || isWall) break;
+          obj = obj.parent;
         }
+
+        if (isPlayerWeapon) {
+          continue; // Ignore player's own weapons/shield and keep checking
+        }
+
+        if (isWall) {
+          break; // Hit a wall, stop checking
+        }
+
+        // Check if we hit an opponent
+        if (isOpponent && obj) {
+          if (!obj.userData.isDisabled) {
+            // Friendly fire check
+            if (obj.userData.team !== playerTeam) {
+              obj.userData.onHit();
+              incrementScore();
+              triggerHitMarker();
+            }
+          }
+          break; // Stop checking after hitting an opponent (even if disabled or friendly)
+        }
+        
+        // If it's none of the above (e.g. floor, health bar, laser beam), ignore it and keep checking
       }
     }
   };
@@ -219,13 +248,13 @@ export function Player() {
     <>
       {!isSpectating && <PointerLockControls />}
       {laserActive && (
-        <mesh ref={laserRef}>
+        <mesh ref={laserRef} userData={{ isPlayerWeapon: true }}>
           <cylinderGeometry args={[0.01, 0.01, 100]} />
           <meshBasicMaterial color={activePowerUps.RAPID_FIRE ? "#ff00ff" : "#00ffff"} transparent opacity={0.8} />
         </mesh>
       )}
       {activePowerUps.SHIELD && activePowerUps.SHIELD > 0 && (
-        <mesh position={[0, 0, -1]} rotation={[0, 0, 0]}>
+        <mesh position={[0, 0, -1]} rotation={[0, 0, 0]} userData={{ isPlayerWeapon: true }}>
           <sphereGeometry args={[2, 32, 32]} />
           <meshBasicMaterial color="#ffff00" transparent opacity={0.1} wireframe />
         </mesh>

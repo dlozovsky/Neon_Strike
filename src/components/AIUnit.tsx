@@ -169,10 +169,24 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         let isProtected = false;
 
         if (intersects.length > 0) {
-          const hit = intersects[0];
-          if (hit.object.userData.isWall && hit.distance < targetPos.distanceTo(testPos)) {
-            hasLOS = false;
-            isProtected = true;
+          for (const hit of intersects) {
+            if (hit.distance > targetPos.distanceTo(testPos)) continue;
+            
+            let obj: THREE.Object3D | null = hit.object;
+            let isWall = false;
+            while (obj) {
+              if (obj.userData && obj.userData.isWall) {
+                isWall = true;
+                break;
+              }
+              obj = obj.parent;
+            }
+            
+            if (isWall) {
+              hasLOS = false;
+              isProtected = true;
+              break;
+            }
           }
         }
 
@@ -186,7 +200,25 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
         const peekTestPos = testPos.clone().add(dirToTarget.clone().cross(new THREE.Vector3(0, 1, 0)).multiplyScalar(1.5));
         raycaster.set(peekTestPos, v2.subVectors(targetPos, peekTestPos).normalize());
         const peekIntersects = raycaster.intersectObjects(scene.children, true);
-        const canPeek = peekIntersects.length === 0 || !peekIntersects[0].object.userData.isWall;
+        
+        let canPeek = true;
+        for (const hit of peekIntersects) {
+          if (hit.distance > targetPos.distanceTo(peekTestPos)) continue;
+          
+          let obj: THREE.Object3D | null = hit.object;
+          let isWall = false;
+          while (obj) {
+            if (obj.userData && obj.userData.isWall) {
+              isWall = true;
+              break;
+            }
+            obj = obj.parent;
+          }
+          if (isWall) {
+            canPeek = false;
+            break;
+          }
+        }
         
         if (canPeek) score += 30;
 
@@ -203,17 +235,45 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     if (!groupRef.current) return false;
     const origin = groupRef.current.position.clone().add(v1.set(0, 0.5, 0));
     const dir = v2.subVectors(targetPos, origin).normalize();
+    const distToTarget = targetPos.distanceTo(origin);
+    
     raycaster.set(origin, dir);
     const intersects = raycaster.intersectObjects(scene.children, true);
     
-    if (intersects.length > 0) {
-      const hit = intersects[0];
-      if (hit.object.userData.isWall) return false;
-      // Friendly fire check: if we hit a teammate, don't shoot
-      if (hit.object.userData.isOpponent && hit.object.userData.team === team) return false;
-      return true;
+    for (const hit of intersects) {
+      // Ignore hits that are further than the target
+      if (hit.distance > distToTarget + 1) continue;
+
+      let obj: THREE.Object3D | null = hit.object;
+      let isOpponent = false;
+      let isWall = false;
+      let teamId = null;
+      let objId = null;
+
+      while (obj) {
+        if (obj.userData) {
+          if (obj.userData.isOpponent) {
+            isOpponent = true;
+            teamId = obj.userData.team;
+            objId = obj.userData.id;
+          }
+          if (obj.userData.isWall) isWall = true;
+        }
+        if (isOpponent || isWall) break;
+        obj = obj.parent;
+      }
+
+      if (isWall) return false;
+      if (isOpponent) {
+        if (objId === id) continue; // Ignore self
+        if (teamId === team) return false; // Friendly fire
+        // If it's an enemy, we have LOS
+        return true;
+      }
     }
-    return false;
+    
+    // If nothing blocked the ray before reaching the target, we have LOS
+    return true;
   };
 
   useFrame((stateObj, delta) => {
@@ -473,7 +533,15 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
     // Cast a ray in the movement direction to detect walls/obstacles
     raycaster.set(groupRef.current.position, moveDir);
     const obstacles = raycaster.intersectObjects(stateObj.scene.children, true)
-      .filter(hit => hit.object.userData.isWall && hit.distance < 3);
+      .filter(hit => {
+        if (hit.distance >= 3) return false;
+        let obj: THREE.Object3D | null = hit.object;
+        while (obj) {
+          if (obj.userData && obj.userData.isWall) return true;
+          obj = obj.parent;
+        }
+        return false;
+      });
 
     if (obstacles.length > 0) {
       // Calculate a steering force away from the obstacle
@@ -566,10 +634,35 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
             raycaster.set(groupRef.current!.position.clone().add(v1.set(0, 0.5, 0)), v2.subVectors(predictedPos, groupRef.current!.position).normalize());
             const intersects = raycaster.intersectObjects(stateObj.scene.children, true);
             if (intersects.length > 0) {
-              const hit = intersects[0];
-              if (hit.object.userData.isOpponent && hit.object.userData.onHit) {
-                hit.object.userData.onHit();
-                incrementTeamScore(team); // AI unit's team gets score
+              for (const hit of intersects) {
+                let obj: THREE.Object3D | null = hit.object;
+                let isOpponent = false;
+                let isWall = false;
+                
+                while (obj) {
+                  if (obj.userData) {
+                    if (obj.userData.isOpponent) isOpponent = true;
+                    if (obj.userData.isWall) isWall = true;
+                  }
+                  if (isOpponent || isWall) break;
+                  obj = obj.parent;
+                }
+
+                if (isWall) break;
+
+                if (isOpponent && obj && obj.userData.onHit) {
+                  // Don't shoot ourselves
+                  if (obj.userData.id === id) {
+                    continue; // Ignore self and keep checking
+                  }
+                  
+                  if (!obj.userData.isDisabled) {
+                    // Hit another opponent
+                    obj.userData.onHit();
+                    incrementTeamScore(team); // AI unit's team gets score
+                  }
+                  break; // Stop checking after hitting an opponent (even if disabled)
+                }
               }
             }
           }
@@ -600,7 +693,8 @@ export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPat
       isOpponent: true,
       isDisabled,
       onHit,
-      team
+      team,
+      id
     };
 
     // Update store for minimap
