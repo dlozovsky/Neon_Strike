@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, memo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ interface OpponentProps {
 
 type AIState = 'patrol' | 'chase' | 'flank' | 'seekCover' | 'attack' | 'guardPlayer' | 'coordinateAttack' | 'peek';
 
-export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
+export function AIUnit({ id, initialPosition, type = 'tactical', team, patrolPath }: OpponentProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const [health, setHealth] = useState(100);
@@ -26,15 +26,20 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
   const [hitFlash, setHitFlash] = useState(false);
   const [targetPos, setTargetPos] = useState(new THREE.Vector3(...initialPosition));
   const currentWaypointIndex = useRef(0);
-  const score = useGameStore(state => state.score);
-  const hitsReceived = useGameStore(state => state.hitsReceived);
-  const playerHit = useGameStore(state => state.playerHit);
-  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
-  const updateOpponent = useGameStore(state => state.updateOpponent);
-  const playerTeam = useGameStore(state => state.playerTeam);
-  const hitMarkerActive = useGameStore(state => state.hitMarkerActive);
-  const incrementTeamScore = useGameStore(state => state.incrementTeamScore);
-  const updateTacticalData = useGameStore(state => state.updateTacticalData);
+  const { 
+    score, 
+    hitsReceived, 
+    playerHit, 
+    isPlayerDisabled, 
+    updateOpponent, 
+    opponents, 
+    playerPos: playerPosStore, 
+    playerTeam, 
+    hitMarkerActive, 
+    incrementTeamScore,
+    tacticalData,
+    updateTacticalData
+  } = useGameStore();
   
   // Dynamic Difficulty Factor (0.6 to 1.5)
   const difficultyFactor = useMemo(() => {
@@ -251,10 +256,6 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
     playerUnderFireTimer.current = Math.max(0, playerUnderFireTimer.current - delta);
 
     // Find nearest enemy
-    const state = useGameStore.getState();
-    const opponents = state.opponents;
-    const tacticalData = state.tacticalData;
-    
     const playerPos = stateObj.camera.position;
     const distToPlayer = groupRef.current.position.distanceTo(playerPos);
     distToPlayerRef.current = distToPlayer;
@@ -729,16 +730,14 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
       team
     };
 
-    // Update store for minimap (throttled to every 3 frames)
-    if (stateObj.clock.elapsedTime * 60 % 3 < 1) {
-      updateOpponent(id, {
-        id,
-        pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
-        type,
-        isDisabled,
-        team
-      });
-    }
+    // Update store for minimap
+    updateOpponent(id, {
+      id,
+      pos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
+      type,
+      isDisabled,
+      team
+    });
   });
 
   const stateColors: Record<AIState, string> = {
@@ -901,5 +900,5 @@ export const AIUnit = memo(function AIUnit({ id, initialPosition, type = 'tactic
       </mesh>
     </group>
   </>
-  );
-});
+);
+}

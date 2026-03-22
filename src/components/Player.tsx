@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, memo } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,19 +9,24 @@ import { soundManager } from '../services/soundService';
 const SPEED = 5;
 const PLAYER_RADIUS = 0.5;
 
-export const Player = memo(function Player() {
+export function Player() {
   const [, getKeys] = useKeyboardControls();
   const camera = useThree((state) => state.camera);
   const scene = useThree((state) => state.scene);
-  const isPlayerDisabled = useGameStore(state => state.isPlayerDisabled);
-  const incrementScore = useGameStore(state => state.incrementScore);
-  const respawnRequested = useGameStore(state => state.respawnRequested);
-  const triggerHitMarker = useGameStore(state => state.triggerHitMarker);
-  const updatePlayerTransform = useGameStore(state => state.updatePlayerTransform);
-  const playerTeam = useGameStore(state => state.playerTeam);
-  const activePowerUps = useGameStore(state => state.activePowerUps);
-  const isSpectating = useGameStore(state => state.isSpectating);
-  const spectatorTargetId = useGameStore(state => state.spectatorTargetId);
+  const { 
+    isPlayerDisabled, 
+    incrementScore, 
+    respawnRequested, 
+    triggerHitMarker, 
+    updatePlayerTransform, 
+    playerTeam,
+    activePowerUps,
+    isSpectating,
+    spectatorTargetId,
+    opponents,
+    playerPos,
+    playerYaw
+  } = useGameStore();
   
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
@@ -121,16 +126,12 @@ export const Player = memo(function Player() {
 
   useEffect(() => {
     if (!isSpectating) {
-      const state = useGameStore.getState();
-      camera.position.set(state.playerPos[0], state.playerPos[1], state.playerPos[2]);
-      camera.rotation.set(0, state.playerYaw, 0);
+      camera.position.set(playerPos[0], playerPos[1], playerPos[2]);
+      camera.rotation.set(0, playerYaw, 0);
     }
-  }, [isSpectating, camera]);
+  }, [isSpectating]);
 
   useFrame((state, delta) => {
-    const gameState = useGameStore.getState();
-    const opponents = gameState.opponents;
-
     if (isSpectating) {
       // Spectator Camera Logic
       let targetPos = new THREE.Vector3();
@@ -149,15 +150,11 @@ export const Player = memo(function Player() {
         const opp = opponents[spectatorTargetId];
         if (opp) {
           targetPos.set(opp.pos[0], opp.pos[1], opp.pos[2]);
-          // Improved Chase camera: Higher and slightly back
-          const offset = new THREE.Vector3(0, 6, 10);
+          // Chase camera offset
+          const offset = new THREE.Vector3(0, 2, 5);
+          // We don't have the opponent's yaw easily in the store yet, but we can look at them
           const camTarget = targetPos.clone();
           const camPos = targetPos.clone().add(offset);
-          
-          // Clamp camera position within arena bounds to avoid clipping into walls
-          const limit = ARENA_SIZE / 2 - 2;
-          camPos.x = Math.max(-limit, Math.min(limit, camPos.x));
-          camPos.z = Math.max(-limit, Math.min(limit, camPos.z));
           
           camera.position.lerp(camPos, 0.1);
           camera.lookAt(camTarget);
@@ -211,13 +208,11 @@ export const Player = memo(function Player() {
       laserRef.current.translateZ(0.2); // Slightly down
     }
 
-    // Update store for minimap (throttled to every 3 frames)
-    if (state.clock.elapsedTime * 60 % 3 < 1) {
-      updatePlayerTransform(
-        [camera.position.x, camera.position.y, camera.position.z],
-        camera.rotation.y
-      );
-    }
+    // Update store for minimap
+    updatePlayerTransform(
+      [camera.position.x, camera.position.y, camera.position.z],
+      camera.rotation.y
+    );
   });
 
   return (
@@ -237,4 +232,4 @@ export const Player = memo(function Player() {
       )}
     </>
   );
-});
+}
