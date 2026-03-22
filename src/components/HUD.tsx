@@ -279,8 +279,7 @@ export const HUD = memo(function HUD() {
             </div>
           </div>
           
-          {/* Transition Overlay */}
-          <div key={`transition-${spectatorTargetId}`} className="absolute inset-0 bg-white/10 pointer-events-none animate-out fade-out duration-300 backdrop-invert-[0.1]" />
+          {/* Transition Overlay removed for smooth camera interpolation */}
           
           <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 pointer-events-auto">
           <div className="bg-black/80 backdrop-blur-xl border border-cyan-500/50 p-6 rounded-2xl flex items-center gap-8 shadow-[0_0_30px_rgba(6,182,212,0.2)]">

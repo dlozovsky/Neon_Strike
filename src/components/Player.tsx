@@ -31,6 +31,8 @@ export const Player = memo(function Player() {
 
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2(0, 0));
+  const spectatorLookAt = useRef(new THREE.Vector3());
+  const isFirstSpectatorFrame = useRef(true);
 
   const checkCollision = (pos: THREE.Vector3) => {
     // Arena bounds
@@ -133,38 +135,42 @@ export const Player = memo(function Player() {
     const opponents = gameState.opponents;
 
     if (isSpectating) {
-      // Spectator Camera Logic
-      let targetPos = new THREE.Vector3();
-      let targetYaw = 0;
+      if (isFirstSpectatorFrame.current) {
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        spectatorLookAt.current.copy(camera.position).add(forward.multiplyScalar(10));
+        isFirstSpectatorFrame.current = false;
+      }
+
+      let camTarget = new THREE.Vector3();
+      let camPos = new THREE.Vector3();
 
       if (spectatorTargetId === 'player') {
-        // If spectating player, we use the player's last known position from store or just the camera's current if it was player
-        // But player component IS the camera usually. 
-        // Let's make it follow the player's logical position
-        targetPos.set(camera.position.x, camera.position.y, camera.position.z);
-        // For player, we don't need to move the camera as it IS the player
-        // However, if we want a "chase cam" for the player too:
-        // Actually, let's just stay in first person for player
-        return; 
+        camPos.set(gameState.playerPos[0], gameState.playerPos[1], gameState.playerPos[2]);
+        const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), gameState.playerYaw);
+        camTarget.copy(camPos).add(forward.multiplyScalar(10));
       } else {
         const opp = opponents[spectatorTargetId];
         if (opp) {
-          targetPos.set(opp.pos[0], opp.pos[1], opp.pos[2]);
-          // Improved Chase camera: Higher and slightly back
+          camTarget.set(opp.pos[0], opp.pos[1], opp.pos[2]);
           const offset = new THREE.Vector3(0, 6, 10);
-          const camTarget = targetPos.clone();
-          const camPos = targetPos.clone().add(offset);
+          camPos = camTarget.clone().add(offset);
           
-          // Clamp camera position within arena bounds to avoid clipping into walls
           const limit = ARENA_SIZE / 2 - 2;
           camPos.x = Math.max(-limit, Math.min(limit, camPos.x));
           camPos.z = Math.max(-limit, Math.min(limit, camPos.z));
-          
-          camera.position.lerp(camPos, 0.1);
-          camera.lookAt(camTarget);
+        } else {
+          return;
         }
       }
+
+      const lerpFactor = 1 - Math.exp(-5 * delta);
+      camera.position.lerp(camPos, lerpFactor);
+      spectatorLookAt.current.lerp(camTarget, lerpFactor);
+      camera.lookAt(spectatorLookAt.current);
+      
       return;
+    } else {
+      isFirstSpectatorFrame.current = true;
     }
 
     if (!document.pointerLockElement) return;
